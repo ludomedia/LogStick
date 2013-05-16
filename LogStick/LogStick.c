@@ -419,7 +419,25 @@ void type_out_char(uint8_t ascii, FILE *stream)
 
 static FILE mystdout = FDEV_SETUP_STREAM(type_out_char, NULL, _FDEV_SETUP_WRITE); // setup writing stream
 
-void sensorRequest() {
+#define SENSOR_HIGH (PINB & (1<<SENSOR_PIN))
+#define SENSOR_LOW (!SENSOR_HIGH)
+
+#define TIMEOUT 1000
+// 116 loopCnt for a one, 42 loopCnt for a zero (mesured)
+#define LIMIT 921
+
+uchar sensor_bytes[5];
+
+uchar sensorRead() {
+
+	// INIT BUFFERVAR TO RECEIVE DATA
+	uint8_t cnt = 7;
+	uint8_t idx = 0;
+
+	// EMPTY BUFFER
+	//for (int i=0; i< 5; i++) bits[i] = 0;
+
+	// REQUEST SAMPLE
 	// set pin to low as output
 	PORTB &= ~(1<<SENSOR_PIN);
 	DDRB |= (1<<SENSOR_PIN);
@@ -427,90 +445,142 @@ void sensorRequest() {
 	// set pin as input with pullup
 	DDRB &= ~(1<<SENSOR_PIN);
 	PORTB |= (1<<SENSOR_PIN);
+	_delay_us(10);
+
+	unsigned int loopCnt;
+
+	// Wait first falling edge
+	loopCnt = TIMEOUT;
+	while(SENSOR_HIGH) if(loopCnt-- == 0) return 0;
+
+	// Wait rising edge
+	loopCnt = TIMEOUT;
+	while(SENSOR_LOW) if(loopCnt-- == 0) return 0;
+
+	// Wait falling edge
+	loopCnt = TIMEOUT;
+	while(SENSOR_HIGH) if(loopCnt-- == 0) return 0;
+
+	uchar j = 0;
+	uchar index;
+	// READ THE OUTPUT - 40 BITS => 5 BYTES
+	for (uchar i=0; i<40; i++) {
+		// wait rising edge
+		loopCnt = TIMEOUT;
+		while(SENSOR_LOW) if(loopCnt-- == 0) return 0;
+		// wait falling edge, mesure high level length
+		loopCnt = TIMEOUT;
+		while(SENSOR_HIGH) if(loopCnt-- == 0) return 0;
+		index = i>>3;
+		sensor_bytes[index] <<= 1;
+		if(loopCnt<LIMIT) sensor_bytes[index] |= 1;
+	}
+
+	return 1;
 }
+
+//	eeprom_write_word(4, 20);
+//	eeprom_write_word(6, 1345);
+	
+#define LED_ON (PORTB |= (1<<LED_PIN))
+#define LED_OFF	(PORTB &= ~(1<<LED_PIN))
+#define ACQ_MODE (PINB & (1<<SWITCH_PIN))
 
 int main()
 {
-/*
+
 	DDRB |= 1<<LED_PIN;
 
 	PORTB |= 1<<SWITCH_PIN; // pullup for switch
 
-	int cnt = 0;
-	for(;;) {
-		if(PINB & (1<<SWITCH_PIN)) {
-			PORTB |= (1<<LED_PIN);
-		}		
-		else {
-			PORTB &= ~(1<<LED_PIN);
-		}
+	LED_OFF;
 
-		if(cnt++>100) {
-			sensorRequest();
-			cnt = 0;
-		}		
-		
-		_delay_ms(20);
-	}
+	_delay_ms(2);
 	
-*/	
-	
-	#if defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny25__)
-	uint8_t calibrationValue = eeprom_read_byte(0); /* calibration value from last time */
-    if (calibrationValue != 0xFF)
-	{
-        OSCCAL = calibrationValue;
-    }
-	#endif
-	
-	stdout = &mystdout; // set default stream
-	
-	// initialize report (I never assume it's initialized to 0 automatically)
-	keyboard_report_reset();
-	
-	wdt_disable(); // disable watchdog, good habit if you don't use it
-	
-	// enforce USB re-enumeration by pretending to disconnect and reconnect
-	usbDeviceDisconnect();
-	_delay_ms(250);
-	usbDeviceConnect();
-	
-	// initialize various modules
-	usbInit();
-	
-	sei(); // enable interrupts
+	if(ACQ_MODE) {
+		int cnt = 0;
+		for(;;) {
+			if(ACQ_MODE) {
+				
+				if(cnt++>400) { // lecture toute les 8 s
+					if(sensorRead()) {
+						LED_ON;
+						_delay_ms(1000);
+						for(int i=0;i<5;i++) eeprom_write_word(10+(i<<1), sensor_bytes[i]);
+						LED_OFF;
+					}
+					else {
+						for(uchar c=0;c<4;c++) {
+							LED_ON;
+							_delay_ms(200);
+							LED_OFF;					
+							_delay_ms(200);
+						}
+					}			
+					cnt = 0;
+				}		
 
-	eeprom_write_word(4, 20);
-	eeprom_write_word(6, 1345);
-	
-	while (1) // main loop, do forever
-	{
-		if (blink_count > 2) // activated by blinking lights
-		{
-			#if !defined(__AVR_ATtiny85__) && !defined(__AVR_ATtiny45__) && !defined(__AVR_ATtiny25__)
-			DDRD |= _BV(1); // LED lights for debug
-			PORTD |= _BV(1);
-			#endif
-
-			puts_P(PSTR("\n"));
-			puts_P(PSTR("----------------------------------\n"));
-			puts_P(PSTR(" LogStick 0.1\n"));
-			puts_P(PSTR("----------------------------------\n"));
-			// PLACE TEXT HERE
-			//puts_P(PSTR(" ")); // test size
-			for(int i=0;i<10;i++) {
-				printf("%d:%d\n", i, eeprom_read_word((i<<1)+4));
+				if((cnt%25)>20) LED_ON;
+				else LED_OFF;
+				_delay_ms(20);
 			}
-			printf("\n");
-			puts_P(PSTR("----------------------------------\n"));
-			
-			blink_count = 0; // reset
+			else cnt = 0;
 		}
-		
-		// perform usb related background tasks
-		usbPoll(); // this needs to be called at least once every 10 ms
-		// this is also called in send_report_once
-	}
 	
+	}		
+	else {
+		#if defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny25__)
+		uint8_t calibrationValue = eeprom_read_byte(0); /* calibration value from last time */
+		if (calibrationValue != 0xFF)
+		{
+			OSCCAL = calibrationValue;
+		}
+		#endif
+	
+		stdout = &mystdout; // set default stream
+	
+		// initialize report (I never assume it's initialized to 0 automatically)
+		keyboard_report_reset();
+	
+		wdt_disable(); // disable watchdog, good habit if you don't use it
+	
+		// enforce USB re-enumeration by pretending to disconnect and reconnect
+		usbDeviceDisconnect();
+		_delay_ms(250);
+		usbDeviceConnect();
+	
+		// initialize various modules
+		usbInit();
+	
+		sei(); // enable interrupts
+
+		while (1) // main loop, do forever
+		{
+			if (blink_count > 2) // activated by blinking lights
+			{
+				#if !defined(__AVR_ATtiny85__) && !defined(__AVR_ATtiny45__) && !defined(__AVR_ATtiny25__)
+				DDRD |= _BV(1); // LED lights for debug
+				PORTD |= _BV(1);
+				#endif
+				puts_P(PSTR("\n"));
+				puts_P(PSTR("----------------------------------\n"));
+				puts_P(PSTR(" LogStick 0.1\n"));
+				puts_P(PSTR("----------------------------------\n"));
+				// PLACE TEXT HERE
+				//puts_P(PSTR(" ")); // test size
+				for(int i=0;i<5;i++) {
+					printf("%d:%d\n", i, eeprom_read_word(10+(i<<1)));
+				}
+				printf("\n");
+				puts_P(PSTR("----------------------------------\n"));
+			
+				blink_count = 0; // reset
+			}
+		
+			// perform usb related background tasks
+			usbPoll(); // this needs to be called at least once every 10 ms
+			// this is also called in send_report_once
+		}
+	}	
 	return 0;
 }
