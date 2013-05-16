@@ -4,7 +4,11 @@
  */
 
 #define F_CPU 16500000
- 
+
+#define LED_PIN	PB4
+#define SWITCH_PIN PB1
+#define SENSOR_PIN PB3
+
  // please see http://www.frank-zhao.com/card/
 // note, for ATtiny MCUs, fuses -U lfuse:w:0xE1:m -U hfuse:w:0xDF:m -U efuse:w:0xFF:m -U lock:w:0xFF:m
 // note, write to ATtiny at a low ISP frequency
@@ -415,8 +419,42 @@ void type_out_char(uint8_t ascii, FILE *stream)
 
 static FILE mystdout = FDEV_SETUP_STREAM(type_out_char, NULL, _FDEV_SETUP_WRITE); // setup writing stream
 
+void sensorRequest() {
+	// set pin to low as output
+	PORTB &= ~(1<<SENSOR_PIN);
+	DDRB |= (1<<SENSOR_PIN);
+	_delay_ms(2);
+	// set pin as input with pullup
+	DDRB &= ~(1<<SENSOR_PIN);
+	PORTB |= (1<<SENSOR_PIN);
+}
+
 int main()
 {
+/*
+	DDRB |= 1<<LED_PIN;
+
+	PORTB |= 1<<SWITCH_PIN; // pullup for switch
+
+	int cnt = 0;
+	for(;;) {
+		if(PINB & (1<<SWITCH_PIN)) {
+			PORTB |= (1<<LED_PIN);
+		}		
+		else {
+			PORTB &= ~(1<<LED_PIN);
+		}
+
+		if(cnt++>100) {
+			sensorRequest();
+			cnt = 0;
+		}		
+		
+		_delay_ms(20);
+	}
+	
+*/	
+	
 	#if defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny25__)
 	uint8_t calibrationValue = eeprom_read_byte(0); /* calibration value from last time */
     if (calibrationValue != 0xFF)
