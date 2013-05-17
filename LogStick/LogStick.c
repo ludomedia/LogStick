@@ -461,10 +461,10 @@ uchar sensorRead() {
 	loopCnt = TIMEOUT;
 	while(SENSOR_HIGH) if(loopCnt-- == 0) return 0;
 
-	uchar j = 0;
 	uchar index;
+	uchar i;
 	// READ THE OUTPUT - 40 BITS => 5 BYTES
-	for (uchar i=0; i<40; i++) {
+	for (i=0; i<40; i++) {
 		// wait rising edge
 		loopCnt = TIMEOUT;
 		while(SENSOR_LOW) if(loopCnt-- == 0) return 0;
@@ -476,7 +476,8 @@ uchar sensorRead() {
 		if(loopCnt<LIMIT) sensor_bytes[index] |= 1;
 	}
 
-	return 1;
+	for(i=0;i<4;i++) sensor_bytes[4] -= sensor_bytes[i];
+	return (sensor_bytes[4]==0) ? 1 : 0;
 }
 
 //	eeprom_write_word(4, 20);
@@ -485,46 +486,65 @@ uchar sensorRead() {
 #define LED_ON (PORTB |= (1<<LED_PIN))
 #define LED_OFF	(PORTB &= ~(1<<LED_PIN))
 #define ACQ_MODE (PINB & (1<<SWITCH_PIN))
+#define LOG_INTERVAL 10
+#define NB_RECORDS 8
+#define START_PTR 10
+// Attention il faut 4 octet de libre depuis MAX_PTR (pour le marquage 0x7FFF)
+#define MAX_PTR (START_PTR + (NB_RECORDS * 4))
+
+void write_record(int ptr, int humidity, int temperature) {
+	eeprom_write_word(ptr + 0, humidity);
+	eeprom_write_word(ptr + 2, temperature);	
+}
 
 int main()
 {
-
-	DDRB |= 1<<LED_PIN;
-
+	DDRB |= 1<<LED_PIN; // led pin as output
 	PORTB |= 1<<SWITCH_PIN; // pullup for switch
-
 	LED_OFF;
-
 	_delay_ms(2);
 	
 	if(ACQ_MODE) {
+		int last_humidity = 0x7FFF;
+		int last_temperature = 0x7FFF;
+		int ptr = START_PTR; // début de la mémoire de log
 		int cnt = 0;
+		int seconds = 0;
+		write_record(ptr, 0x7FFF, 0x7FFF);
 		for(;;) {
 			if(ACQ_MODE) {
 				
-				if(cnt++>400) { // lecture toute les 8 s
+				if(cnt++>500) { // lecture toute les 10 s
 					if(sensorRead()) {
-						LED_ON;
-						_delay_ms(1000);
-						for(int i=0;i<5;i++) eeprom_write_word(10+(i<<1), sensor_bytes[i]);
-						LED_OFF;
+						last_humidity = sensor_bytes[0]<<8 | sensor_bytes[1];
+						last_temperature = sensor_bytes[2]<<8 | sensor_bytes[3];
 					}
-					else {
-						for(uchar c=0;c<4;c++) {
-							LED_ON;
-							_delay_ms(200);
-							LED_OFF;					
-							_delay_ms(200);
-						}
-					}			
+					seconds += 10;
 					cnt = 0;
-				}		
+				}
 
-				if((cnt%25)>20) LED_ON;
-				else LED_OFF;
-				_delay_ms(20);
+				if(ptr<MAX_PTR) {
+					if(seconds>=LOG_INTERVAL && last_humidity!=0x7FFF) {
+						// ecrit une marque d'arrêt après les mesures
+						write_record(ptr + 4, 0x7FFF, 0x7FFF);
+						// écrit les mesures
+						write_record(ptr, last_humidity, last_temperature);
+						ptr += 4;
+						seconds = 0;
+					}
+					// Led clignotante pour signaler le mode aquisition
+					if((cnt%25)>22) LED_ON; 
+					else LED_OFF;
+				}
+				else {
+					LED_ON; // Led allumée pour signaler mémoire pleine
+				}				
+
+				_delay_ms(20); // TODO work with timer interrupt
 			}
-			else cnt = 0;
+			else {
+				LED_OFF;
+			}			
 		}
 	
 	}		
@@ -568,8 +588,14 @@ int main()
 				puts_P(PSTR("----------------------------------\n"));
 				// PLACE TEXT HERE
 				//puts_P(PSTR(" ")); // test size
-				for(int i=0;i<5;i++) {
-					printf("%d:%d\n", i, eeprom_read_word(10+(i<<1)));
+				int last_humidity = 0x7FFF;
+				int last_temperature = 0x7FFF;
+				int ptr = START_PTR; // début de la mémoire de log
+				for(ptr=START_PTR;ptr<MAX_PTR;ptr+=4) {
+					last_humidity = eeprom_read_word(ptr);
+					last_temperature = eeprom_read_word(ptr+2);
+					if(last_humidity==0x7FFF) break;
+					printf("%d,%d\n", last_humidity, last_temperature);
 				}
 				printf("\n");
 				puts_P(PSTR("----------------------------------\n"));
