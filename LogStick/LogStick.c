@@ -4,10 +4,18 @@
  */
 
 #define F_CPU 16500000
+#define DIGISPARK 1
 
-#define LED_PIN	PB4
-#define SWITCH_PIN PB1
-#define SENSOR_PIN PB3
+#if defined(DIGISPARK)
+#	define LED_PIN	PB1
+#	define SWITCH_PIN PB0
+#	define SENSOR_PIN PB2
+#else
+#	define LED_PIN	PB4
+#	define SWITCH_PIN PB1
+#	define SENSOR_PIN PB3
+#endif
+
 
  // please see http://www.frank-zhao.com/card/
 // note, for ATtiny MCUs, fuses -U lfuse:w:0xE1:m -U hfuse:w:0xDF:m -U efuse:w:0xFF:m -U lock:w:0xFF:m
