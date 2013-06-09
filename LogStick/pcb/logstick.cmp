@@ -1,0 +1,87 @@
+Cmp-Mod V01 Created by CvPcb (2013-05-16 BZR 4016)-stable date = 21.05.2013 20:49:09
+
+BeginCmp
+TimeStamp = /519BAD9D;
+Reference = D1;
+ValeurCmp = 3,6V;
+IdModule  = D3;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BADAC;
+Reference = D2;
+ValeurCmp = 3,6V;
+IdModule  = D3;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BB08A;
+Reference = D3;
+ValeurCmp = LED;
+IdModule  = LED-3MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BABEE;
+Reference = IC1;
+ValeurCmp = ATTINY85-P;
+IdModule  = DIP-8__300;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BADEC;
+Reference = K1;
+ValeurCmp = USB;
+IdModule  = PIN_ARRAY_4x1;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BAE03;
+Reference = K2;
+ValeurCmp = DHT44;
+IdModule  = PIN_ARRAY_3X1;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BB00E;
+Reference = K3;
+ValeurCmp = SWITCH;
+IdModule  = PIN_ARRAY_2X1;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BAD11;
+Reference = R1;
+ValeurCmp = 68R;
+IdModule  = R3-5;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BAD67;
+Reference = R2;
+ValeurCmp = 68R;
+IdModule  = R3-5;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BAD76;
+Reference = R3;
+ValeurCmp = 1k5;
+IdModule  = R3-5;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BAF01;
+Reference = R4;
+ValeurCmp = 68R;
+IdModule  = R3-5;
+EndCmp
+
+BeginCmp
+TimeStamp = /519BB0A3;
+Reference = R5;
+ValeurCmp = 220R;
+IdModule  = R3-5;
+EndCmp
+
+EndListe

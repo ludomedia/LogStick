@@ -3,8 +3,13 @@
  * License: GNU GPL v2
  */
 
+
+// AVRDUDE ARGS
+// -pattiny85 -C"C:\$(Device)Program Files (x86)\arduino-1.0.4\hardware\tools\avr\etc/avrdude.conf" -v -v -carduino -P\\.\COM4 -b19200 -Uflash:w:"$(ProjectDir)Debug\$(ItemFileName).hex":i
+
+
 #define F_CPU 16500000
-#define DIGISPARK 1
+//#define DIGISPARK 1
 
 #if defined(DIGISPARK)
 #	define LED_PIN	PB1

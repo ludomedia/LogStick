@@ -1,0 +1,10 @@
+"Id";"Référence";"Boitier";"Quantité";"Désignation";"Fournisseur et réf.";
+1;"R1,R2,R4";"R3-5";3;"68R";;;
+2;"R3";"R3-5";1;"1k5";;;
+3;"R5";"R3-5";1;"220R";;;
+4;"D3";"LED-3MM";1;"LED";;;
+5;"D1,D2";"D3";2;"3,6V";;;
+6;"IC1";"DIP-8__300";1;"ATTINY85-P";;;
+7;"K1";"PIN_ARRAY_4x1";1;"USB";;;
+8;"K2";"PIN_ARRAY_3X1";1;"DHT44";;;
+9;"K3";"PIN_ARRAY_2X1";1;"SWITCH";;;
