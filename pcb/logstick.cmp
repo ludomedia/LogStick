@@ -1,4 +1,11 @@
-Cmp-Mod V01 Created by CvPcb (2013-05-16 BZR 4016)-stable date = 21.05.2013 20:49:09
+Cmp-Mod V01 Created by CvPcb (2013-05-31 BZR 4019)-stable date = 13.06.2013 14:30:56
+
+BeginCmp
+TimeStamp = /51B9BB50;
+Reference = C1;
+ValeurCmp = 100nF;
+IdModule  = C1;
+EndCmp
 
 BeginCmp
 TimeStamp = /519BAD9D;
@@ -25,7 +32,7 @@ BeginCmp
 TimeStamp = /519BABEE;
 Reference = IC1;
 ValeurCmp = ATTINY85-P;
-IdModule  = DIP-8__300;
+IdModule  = DIP-8__300_ELL;
 EndCmp
 
 BeginCmp
