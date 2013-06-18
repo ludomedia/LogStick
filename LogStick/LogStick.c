@@ -4,9 +4,11 @@
  */
 
 
-// AVRDUDE ARGS
+// Example of AVRDUDE ARGS WITH ATMEL STUDIO
+// Programm
 // -pattiny85 -C"C:\$(Device)Program Files (x86)\arduino-1.0.4\hardware\tools\avr\etc/avrdude.conf" -v -v -carduino -P\\.\COM4 -b19200 -Uflash:w:"$(ProjectDir)Debug\$(ItemFileName).hex":i
-
+// Fuse
+//-pattiny85 -P\\.\COM4 -b19200 -carduino -U lfuse:w:0xE1:m -U hfuse:w:0xdf:m -C"C:\$(Device)Program Files (x86)\arduino-1.0.4\hardware\tools\avr\etc/avrdude.conf" -v -v
 
 #define F_CPU 16500000
 //#define DIGISPARK 1
