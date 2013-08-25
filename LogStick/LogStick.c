@@ -6,9 +6,9 @@
 
 // Example of AVRDUDE ARGS WITH ATMEL STUDIO
 // Programm
-// -pattiny85 -C"C:\$(Device)Program Files (x86)\arduino-1.0.4\hardware\tools\avr\etc/avrdude.conf" -v -v -carduino -P\\.\COM4 -b19200 -Uflash:w:"$(ProjectDir)Debug\$(ItemFileName).hex":i
+// -pattiny85 -C"C:\$(Device)Program Files (x86)\Arduino\hardware\tools\avr\etc/avrdude.conf" -v -v -carduino -P\\.\COM4 -b19200 -Uflash:w:"$(ProjectDir)Debug\$(ItemFileName).hex":i
 // Fuse
-//-pattiny85 -P\\.\COM4 -b19200 -carduino -U lfuse:w:0xE1:m -U hfuse:w:0xdf:m -C"C:\$(Device)Program Files (x86)\arduino-1.0.4\hardware\tools\avr\etc/avrdude.conf" -v -v
+//-pattiny85 -P\\.\COM4 -b19200 -carduino -U lfuse:w:0xE1:m -U hfuse:w:0xdf:m -C"C:\$(Device)Program Files (x86)\Arduino\hardware\tools\avr\etc/avrdude.conf" -v -v
 
 #define F_CPU 16500000
 //#define DIGISPARK 1
@@ -501,15 +501,28 @@ uchar sensorRead() {
 #define LED_ON (PORTB |= (1<<LED_PIN))
 #define LED_OFF	(PORTB &= ~(1<<LED_PIN))
 #define ACQ_MODE (PINB & (1<<SWITCH_PIN))
-#define LOG_INTERVAL 10
-#define NB_RECORDS 8
-#define START_PTR 10
+//#define LOG_INTERVAL (2)
+#define LOG_INTERVAL (60*60)
+#define NB_RECORDS 72
+#define START_PTR 12
 // Attention il faut 4 octet de libre depuis MAX_PTR (pour le marquage 0x7FFF)
+// Nb max pour NB_RECORDS = ((EEPROM_SIZE - START_PTR) / 4) - 1 Soit pour AtTiny85: 124
 #define MAX_PTR (START_PTR + (NB_RECORDS * 4))
 
-void write_record(int ptr, int humidity, int temperature) {
+int ptr; // pointeur d'écriture dans le tampon circulaire des mesures
+
+void initPtr() {
+	for(ptr=START_PTR;ptr<MAX_PTR;ptr+=4) {
+		if(eeprom_read_word(ptr)==0x7FFF) return;
+	}
+	ptr = START_PTR;
+}
+
+void write_record(int humidity, int temperature) {
+	eeprom_write_word(ptr + 4, 0x7FFF); // place la marque de la prochaine écriture	
 	eeprom_write_word(ptr + 0, humidity);
 	eeprom_write_word(ptr + 2, temperature);	
+	ptr += 4;
 }
 
 int main()
@@ -518,48 +531,38 @@ int main()
 	PORTB |= 1<<SWITCH_PIN; // pullup for switch
 	LED_OFF;
 	_delay_ms(2);
+	initPtr(); // cherche le point d'écriture dans le tampon
 	
 	if(ACQ_MODE) {
-		int last_humidity = 0x7FFF;
-		int last_temperature = 0x7FFF;
-		int ptr = START_PTR; // début de la mémoire de log
 		int cnt = 0;
-		int seconds = 0;
-		write_record(ptr, 0x7FFF, 0x7FFF);
-		for(;;) {
-			if(ACQ_MODE) {
-				
-				if(cnt++>500) { // lecture toute les 10 s
-					if(sensorRead()) {
-						last_humidity = sensor_bytes[0]<<8 | sensor_bytes[1];
-						last_temperature = sensor_bytes[2]<<8 | sensor_bytes[3];
-					}
-					seconds += 10;
-					cnt = 0;
-				}
-
-				if(ptr<MAX_PTR) {
-					if(seconds>=LOG_INTERVAL && last_humidity!=0x7FFF) {
-						// ecrit une marque d'arrêt après les mesures
-						write_record(ptr + 4, 0x7FFF, 0x7FFF);
-						// écrit les mesures
-						write_record(ptr, last_humidity, last_temperature);
-						ptr += 4;
-						seconds = 0;
-					}
-					// Led clignotante pour signaler le mode aquisition
-					if((cnt%25)>22) LED_ON; 
-					else LED_OFF;
-				}
-				else {
-					LED_ON; // Led allumée pour signaler mémoire pleine
-				}				
+		int seconds = LOG_INTERVAL - 5; // first mesurement: 5 seconds after power on
+		write_record(0x7F00, 0); // place a power on mark
+		for(;;) {			
+			if(ACQ_MODE) {				
 
 				_delay_ms(20); // TODO work with timer interrupt
+
+				if(cnt++>50) { // augmente le compteur de secondes
+					seconds += 1;
+					cnt = 0;
+				}
+								
+				if(seconds>=LOG_INTERVAL) {
+					if(sensorRead()) {
+						write_record(sensor_bytes[0]<<8 | sensor_bytes[1], sensor_bytes[2]<<8 | sensor_bytes[3]);
+						// clear le compteur de seconde uniquement en cas de succès de lecture (ceci permet de tolérer des échec de lecture du capteur)
+						seconds = 0; 
+					}
+				}
+
+				// Led clignotante pour signaler le mode aquisition
+				if((cnt%25)>22) LED_ON; 
+				else LED_OFF;
+
 			}
 			else {
 				LED_OFF;
-			}			
+			}	
 		}
 	
 	}		
@@ -597,23 +600,35 @@ int main()
 				DDRD |= _BV(1); // LED lights for debug
 				PORTD |= _BV(1);
 				#endif
-				puts_P(PSTR("\n"));
-				puts_P(PSTR("----------------------------------\n"));
-				puts_P(PSTR(" LogStick 0.1\n"));
-				puts_P(PSTR("----------------------------------\n"));
+				puts_P(PSTR("----------------------------------"));
+				printf("LogStick 1.0 interval %d seconds\n", LOG_INTERVAL);
+				if(ACQ_MODE) printf("Ptr %x\n", ptr);
+				puts_P(PSTR("----------------------------------"));
 				// PLACE TEXT HERE
 				//puts_P(PSTR(" ")); // test size
-				int last_humidity = 0x7FFF;
-				int last_temperature = 0x7FFF;
-				int ptr = START_PTR; // début de la mémoire de log
-				for(ptr=START_PTR;ptr<MAX_PTR;ptr+=4) {
-					last_humidity = eeprom_read_word(ptr);
-					last_temperature = eeprom_read_word(ptr+2);
-					if(last_humidity==0x7FFF) break;
-					printf("%d,%d\n", last_humidity, last_temperature);
+				int humidity;
+				int temperature;
+				int p = ptr; // pointeur de la prochaine écriture en mode ACQ
+				for(;;) {
+					p -= 4;
+					if(p<START_PTR) p = MAX_PTR-4;
+					if(p==ptr) break;
+					humidity = eeprom_read_word(p);
+					temperature = eeprom_read_word(p+2);
+					if(humidity==0x7F00) {
+						if(ACQ_MODE) printf("%x:", p);
+						puts_P(PSTR("---POWER ON---"));
+					}						
+					else if(humidity==0x7FFF) {
+						puts_P(PSTR("---PTR MARK---")); // ne devrait pas se produire
+					}						
+					else {
+						if(ACQ_MODE) printf("%x:%d.%d,%d.%d\n", p, humidity/10, humidity%10, temperature/10, temperature%10);
+						else printf("%d.%d,%d.%d\n", humidity/10, humidity%10, temperature/10, temperature%10);
+					}					
 				}
-				printf("\n");
-				puts_P(PSTR("----------------------------------\n"));
+				
+				puts_P(PSTR("------------------------------END-"));
 			
 				blink_count = 0; // reset
 			}
